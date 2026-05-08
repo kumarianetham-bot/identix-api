@@ -483,7 +483,7 @@ def generate_id_card(student_data: dict, output_path: str) -> str:
         issued = student_data.get("issued_date",
                                   datetime.now().strftime("%Y-%m-%d"))
         expire = student_data.get("expire_date",
-                                  (datetime.now() + timedelta(days=365*4))
+                                  (datetime.now() + timedelta(days=365))
                                   .strftime("%Y-%m-%d"))
         card = {"issued_date": issued, "expire_date": expire}
 

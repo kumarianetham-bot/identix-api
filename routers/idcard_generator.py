@@ -3,31 +3,57 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from database import get_db
 from pdf_generator import generate_id_card
+from cloudinary_config import upload_pdf
 import models
 import os
 import uuid
+import tempfile
 from datetime import datetime, timedelta
 
 router = APIRouter()
 
-
 PDF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "idcards")
 os.makedirs(PDF_DIR, exist_ok=True)
 
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://127.0.0.1:8000")
-
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  GET  /idcards/generate-card/{student_id}
-#  Stream a single student's ID card PDF directly
+#  GET /idcards/generate-card/{student_id}
+#  View or Download a single student's ID card PDF
 # ══════════════════════════════════════════════════════════════════════════════
 @router.get("/idcards/generate-card/{student_id}")
 def generate_card_get(student_id: str, db: Session = Depends(get_db)):
     student = _get_student_or_404(student_id, db)
-    pdf_path = _make_pdf(student)
-    _save_card_record(student_id, db)
+    card = db.query(models.IDCard).filter(
+        models.IDCard.student_id == student_id
+    ).first()
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    tmp.close()
+
+    student_data = {
+        "student_id":    student.student_id,
+        "first_name":    student.first_name,
+        "last_name":     student.last_name,
+        "department":    student.department,
+        "speciality":    student.speciality,
+        "photo_url":     student.photo_url,
+        "level":         student.level,
+        "campus":        student.campus,
+        "gender":        student.gender,
+        "school":        student.school,
+        "date_of_birth": getattr(student, "date_of_birth", ""),
+        "nationality":   getattr(student, "nationality", ""),
+        "contact":       getattr(student, "contact", ""),
+        "issued_date":   card.issued_date if card else datetime.now().strftime("%Y-%m-%d"),
+        "expire_date":   card.expire_date if card else (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d"),
+    }
+
+    result = generate_id_card(student_data, tmp.name)
+    if not result:
+        raise HTTPException(status_code=500, detail="PDF generation failed")
+
     return FileResponse(
-        path=pdf_path,
+        path=tmp.name,
         media_type="application/pdf",
         filename=f"id_card_{student_id}.pdf"
     )
@@ -35,9 +61,6 @@ def generate_card_get(student_id: str, db: Session = Depends(get_db)):
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  POST /idcards/generate
-#  Generate cards for a list of student IDs.
-#  Returns JSON with a pdf_url per student so the frontend can open/download
-#  the real backend-designed PDF instead of building its own card.
 # ══════════════════════════════════════════════════════════════════════════════
 @router.post("/idcards/generate")
 def generate_cards_post(payload: dict, db: Session = Depends(get_db)):
@@ -49,13 +72,9 @@ def generate_cards_post(payload: dict, db: Session = Depends(get_db)):
     failed = []
 
     for sid in student_ids:
-
         try:
             student = _get_student_or_404(sid, db)
-
-            # ── Generate PDF and upload to Cloudinary ─────────────────────
-            pdf_url = _make_pdf(student)  # now returns Cloudinary URL directly
-
+            pdf_url = _make_pdf(student)
             card = _save_card_record(sid, pdf_url, db)
 
             generated.append({
@@ -99,97 +118,17 @@ def generate_cards_post(payload: dict, db: Session = Depends(get_db)):
         )
 
     return {
-        "success":   True,
+        "success":  True,
         "generated": generated,
         "failed":    failed,
         "total":     len(generated),
-        # Convenience: list of all PDF URLs so the frontend can batch-download
         "pdf_urls":  [c["pdf_url"] for c in generated],
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  Helpers
+#  GET /idcards/{student_id}/download
 # ══════════════════════════════════════════════════════════════════════════════
-
-def _get_student_or_404(student_id: str, db: Session) -> models.Student:
-    student = db.query(models.Student).filter(
-        models.Student.student_id == student_id
-    ).first()
-    if not student:
-        raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
-    return student
-
-
-from cloudinary_config import upload_pdf
-
-def _make_pdf(student: models.Student) -> str:
-    student_data = {
-        "student_id":    student.student_id,
-        "first_name":    student.first_name,
-        "last_name":     student.last_name,
-        "department":    student.department,
-        "speciality":    student.speciality,
-        "photo_url":     student.photo_url,
-        "level":         student.level,
-        "campus":        student.campus,
-        "gender":        student.gender,
-        "school":        student.school,
-        "date_of_birth": getattr(student, "date_of_birth", ""),
-        "nationality":   getattr(student, "nationality", ""),
-        "contact":       getattr(student, "contact", ""),
-    }
-
-    # Save PDF temporarily
-    filename = f"id_card_{student.student_id}.pdf"
-    output_path = os.path.join(PDF_DIR, filename)
-
-    result = generate_id_card(student_data, output_path)
-    if not result:
-        raise Exception(f"PDF generation failed for {student.student_id}")
-
-    # Upload to Cloudinary and return permanent URL
-    cloudinary_url = upload_pdf(
-        output_path,
-        public_id=f"id_card_{student.student_id}"
-    )
-    return cloudinary_url
-
-    # Use a stable filename so re-generating overwrites the old file
-    filename = f"id_card_{student.student_id}.pdf"
-    output_path = os.path.join(PDF_DIR, filename)
-
-    result = generate_id_card(student_data, output_path)
-    if not result:
-        raise Exception(f"PDF generation failed for student {student.student_id}")
-    return result
-
-
-def _save_card_record(student_id: str,pdf_url: str, db: Session) -> models.IDCard:
-    issued = datetime.now().strftime("%Y-%m-%d")
-    expire = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
-    existing = db.query(models.IDCard).filter(
-        models.IDCard.student_id == student_id
-    ).first()
-    if existing:
-        existing.issued_date = issued
-        existing.expire_date = expire
-        existing.pdf_url     = pdf_url
-        db.commit()
-        db.refresh(existing)
-        return existing
-    card = models.IDCard(
-        card_id=str(uuid.uuid4()),
-        student_id=student_id,
-        issued_date=issued,
-        expire_date=expire,
-        pdf_url    = pdf_url,
-    )
-    db.add(card)
-    db.commit()
-    db.refresh(card)
-    return card
-
 @router.get("/idcards/{student_id}/download")
 def download_idcard(student_id: str, db: Session = Depends(get_db)):
     student = _get_student_or_404(student_id, db)
@@ -199,8 +138,6 @@ def download_idcard(student_id: str, db: Session = Depends(get_db)):
     if not card:
         raise HTTPException(status_code=404, detail="No card found for this student")
 
-    # Regenerate PDF fresh every time
-    import tempfile
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     tmp.close()
 
@@ -231,3 +168,74 @@ def download_idcard(student_id: str, db: Session = Depends(get_db)):
         media_type="application/pdf",
         filename=f"id_card_{student.student_id}.pdf"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Helpers
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _get_student_or_404(student_id: str, db: Session) -> models.Student:
+    student = db.query(models.Student).filter(
+        models.Student.student_id == student_id
+    ).first()
+    if not student:
+        raise HTTPException(status_code=404, detail=f"Student {student_id} not found")
+    return student
+
+
+def _make_pdf(student: models.Student) -> str:
+    student_data = {
+        "student_id":    student.student_id,
+        "first_name":    student.first_name,
+        "last_name":     student.last_name,
+        "department":    student.department,
+        "speciality":    student.speciality,
+        "photo_url":     student.photo_url,
+        "level":         student.level,
+        "campus":        student.campus,
+        "gender":        student.gender,
+        "school":        student.school,
+        "date_of_birth": getattr(student, "date_of_birth", ""),
+        "nationality":   getattr(student, "nationality", ""),
+        "contact":       getattr(student, "contact", ""),
+    }
+
+    filename = f"id_card_{student.student_id}.pdf"
+    output_path = os.path.join(PDF_DIR, filename)
+
+    result = generate_id_card(student_data, output_path)
+    if not result:
+        raise Exception(f"PDF generation failed for {student.student_id}")
+
+    # Upload to Cloudinary and return permanent URL
+    cloudinary_url = upload_pdf(
+        output_path,
+        public_id=f"id_card_{student.student_id}"
+    )
+    return cloudinary_url
+
+
+def _save_card_record(student_id: str, pdf_url: str, db: Session) -> models.IDCard:
+    issued = datetime.now().strftime("%Y-%m-%d")
+    expire = (datetime.now() + timedelta(days=365)).strftime("%Y-%m-%d")
+    existing = db.query(models.IDCard).filter(
+        models.IDCard.student_id == student_id
+    ).first()
+    if existing:
+        existing.issued_date = issued
+        existing.expire_date = expire
+        existing.pdf_url     = pdf_url
+        db.commit()
+        db.refresh(existing)
+        return existing
+    card = models.IDCard(
+        card_id     = str(uuid.uuid4()),
+        student_id  = student_id,
+        issued_date = issued,
+        expire_date = expire,
+        pdf_url     = pdf_url,
+    )
+    db.add(card)
+    db.commit()
+    db.refresh(card)
+    return card
