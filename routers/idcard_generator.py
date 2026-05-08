@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 
 router = APIRouter()
 
-PDF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static", "idcards")
+PDF_DIR = "/tmp/idcards"
 os.makedirs(PDF_DIR, exist_ok=True)
 
 
