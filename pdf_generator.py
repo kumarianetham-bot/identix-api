@@ -36,7 +36,11 @@ GAP    = 8 * mm   # gap between front and back
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE     = os.path.dirname(os.path.abspath(__file__))
-LOGO_PATH = os.path.join(_HERE, "yibs_logo_official.png")
+LOGO_PATH = os.path.join(_HERE, "school_logo.png")
+ICON_LOCATION = os.path.join(_HERE, "icon_location.png")
+ICON_PHONE    = os.path.join(_HERE, "icon_phone.png")
+ICON_GLOBE    = os.path.join(_HERE, "icon_globe.png")
+ICON_EMAIL    = os.path.join(_HERE, "icon_email.png")
 IDENTIX_WATERMARK_PATH = os.path.join(_HERE, "identix_logo.png")
 
 
@@ -267,16 +271,24 @@ def _draw_front(c, ox, oy, student, card):
     logo_size = 16*mm
     _draw_logo(c, ox+3*mm, oy+H-logo_size-2*mm, logo_size, logo_size)
 
-    # School name
+    
+ # School name — color matches YIBS logo blue
+    SCHOOL_BLUE = HexColor("#1B75BB")
+    GOLD        = HexColor("#C8963E")
+
     c.setFont("Helvetica-Bold", 8.5)
-    c.setFillColor(DARK_BLUE)
+    c.setFillColor(SCHOOL_BLUE)
     c.drawString(ox+21*mm, oy+H-8*mm, "YAOUNDE INTERNATIONAL")
     c.drawString(ox+21*mm, oy+H-13*mm, "BUSINESS SCHOOL")
-    c.setFont("Helvetica-Oblique", 5.5)
-    c.setFillColor(MID_BLUE)
-    c.drawString(ox+21*mm, oy+H-17*mm, "Developing Innovative Professionals")
 
-    # IDentix logo removed from top right as requested
+    # Gold accent line under school name
+    c.setStrokeColor(GOLD)
+    c.setLineWidth(0.8)
+    c.line(ox+21*mm, oy+H-14*mm, ox+W-5*mm, oy+H-14*mm)
+
+    c.setFont("Helvetica-Oblique", 5.5)
+    c.setFillColor(SCHOOL_BLUE)
+    c.drawString(ox+21*mm, oy+H-17*mm, "Training Innovative Professionals")
 
     # Watermark
     _draw_watermark(c, ox, oy, W, H)
@@ -326,24 +338,33 @@ def _draw_front(c, ox, oy, student, card):
     c.drawCentredString(ph_x+ph_w/2, badge_y+1.2*mm, "STUDENT")
 
     # ── Student name ──────────────────────────────────────────────────────────
-    nx = ph_x + ph_w + 3*mm
+    nx = ph_x + ph_w + 3*mm 
+    ny = oy + H - 22*mm
     ny = oy + H - 22*mm
     first = student.get("first_name", "")
     last  = student.get("last_name", "")
-    c.setFont("Helvetica-Bold", 12)
+    GOLD  = HexColor("#C8963E")
+
+    c.setFont("Helvetica-Bold", 11)
     c.setFillColor(DARK_BLUE)
     c.drawString(nx, ny, f"{first} {last}")
 
-    # Divider under name
-    c.setStrokeColor(HexColor("#DDDDDD"))
-    c.setLineWidth(0.5)
-    c.line(nx, ny-1*mm, ox+W-3*mm, ny-1*mm)
+    # Gold underline under name
+    c.setStrokeColor(GOLD)
+    c.setLineWidth(0.8)
+    c.line(nx, ny-1.5*mm, ox+W-3*mm, ny-1.5*mm)
+
+    # Academic year — small, fits in available space
+    acad_year = f"Academic Year: {datetime.now().year} — {datetime.now().year + 1}"
+    c.setFont("Helvetica", 4.5)
+    c.setFillColor(HexColor("#888888"))
+    c.drawRightString(ox+W-3*mm, ny-4*mm, acad_year)
 
     # ── Info grid (2 columns) ─────────────────────────────────────────────────
     col1_lbl = nx
-    col1_val = nx + 15*mm
-    col2_lbl = nx + (W - nx + ox) / 2 - ox + ox + 2*mm
-    col2_val = col2_lbl + 15*mm
+    col1_val = nx + 14*mm
+    col2_lbl = nx + (W - nx + ox) / 2 - ox + ox + 5*mm
+    col2_val = col2_lbl + 13*mm
 
     # vertical divider between columns
     mid_x = (col1_lbl + col2_lbl) / 2 + 10*mm
@@ -357,11 +378,13 @@ def _draw_front(c, ox, oy, student, card):
         ("Program",        student.get("speciality", student.get("department","")), TEXT_BLUE),
         ("Level",          student.get("level", ""),          TEXT_BLUE),
     ]
+    
     rows_right = [
-        ("Nationality",  student.get("nationality", ""),  TEXT_BLUE),
-        ("Issue Date",   card.get("issued_date", ""),     TEXT_BLUE),
-        ("Valid Until",  card.get("expire_date", ""),     TEXT_BLUE),
+    ("Campus",      student.get("campus", ""),        TEXT_BLUE),
+    ("Issue Date",  card.get("issued_date", ""),      TEXT_BLUE),
+    ("Valid Until", card.get("expire_date", ""),      TEXT_BLUE),
     ]
+    
 
     row_gap = 4.8*mm
     start_y = ny - 5*mm
@@ -463,17 +486,25 @@ def _draw_back(c, ox, oy, student, card):
     qr_x = ox + W*0.52 + 3*mm
     qr_y = oy + H - 19*mm - qr_size - 1*mm
 
-    qr_data = json.dumps({
-        "student_id": student.get("student_id"), "name": student.get("first_name", "") + " " + student.get("last_name", ""),
-        "department": student.get("department", ""),
-        "speciality": student.get("speciality", ""),
-        "level": student.get("level", ""),
-        "campus": student.get("campus", ""),
-        "nationality": student.get("nationality", ""),
-        "date_of_birth": student.get("date_of_birth", ""),
-        "issued": card.get("issued_date", ""),
-        "expires": card.get("expire_date", ""),
-    }, ensure_ascii=False)
+    qr_data = json.dumps({  
+    "student_id":    student.get("student_id"),
+    "name":          f"{student.get('first_name','')} {student.get('last_name','')}",
+    "email":         student.get("email", ""),
+    "department":    student.get("department", ""),
+    "speciality":    student.get("speciality", ""),
+    "level":         student.get("level", ""),
+    "campus":        student.get("campus", ""),
+    "nationality":   student.get("nationality", ""),
+    "date_of_birth": student.get("date_of_birth", ""),
+    "gender":        student.get("gender", ""),
+    "contact":       student.get("contact", ""),
+    "address":       student.get("address", ""),
+    "city":          student.get("city", ""),
+    "school":        student.get("school", ""),
+    "photo_url":     student.get("photo_url", ""),
+    "issued":        card.get("issued_date", ""),
+    "expires":       card.get("expire_date", ""),
+}, ensure_ascii=False)
 
     qr_buf = _make_qr(qr_data)
     if qr_buf:
@@ -490,25 +521,38 @@ def _draw_back(c, ox, oy, student, card):
     c.drawCentredString(qr_x + qr_size/2, qr_y - 4*mm, sid)
 
     # ── Footer icons ──────────────────────────────────────────────────────────
-    footer_y = oy + 3*mm
-    c.setFont("Helvetica", 4.5)
-    c.setFillColor(WHITE)
-
     contact = student.get("contact", student.get("emergency_phone", ""))
+    footer_y = oy + 2*mm
 
     items = [
-        ("📍", "Yaounde, Cameroon"),
-        ("📞", contact or "+237 6XX XXX XXX"),
-        ("🌐", "www.yibs.cm"),
-        ("✉", "info@yibs.cm"),
+        (ICON_LOCATION, "Yaounde, Cameroon"),
+        (ICON_PHONE,    contact or "+237 6XX XXX XXX"),
+        (ICON_GLOBE,    "www.yibs.cm"),
+        (ICON_EMAIL,    "info@yibs.cm"),
     ]
+
     spacing = W / len(items)
-    for i, (icon, text) in enumerate(items):
-        fx = ox + i * spacing + spacing/2
-        c.drawCentredString(fx, footer_y + 1.5*mm, icon)
-        c.drawCentredString(fx, footer_y - 1*mm, text)
+    icon_size = 4*mm
 
+    for i, (icon_path, text) in enumerate(items):
+        fx = ox + i * spacing + spacing / 2
 
+        # Draw icon if file exists
+        if os.path.exists(icon_path):
+            c.drawImage(
+                ImageReader(icon_path),
+                fx - icon_size / 2,
+                footer_y + 3.5*mm,
+                icon_size,
+                icon_size,
+                preserveAspectRatio=True,
+                mask="auto"
+            )
+
+        # Text below icon
+        c.setFont("Helvetica", 4.2)
+        c.setFillColor(WHITE)
+        c.drawCentredString(fx, footer_y + 1*mm, text)
 # ─────────────────────────────────────────────────────────────────────────────
 #  Public entry point
 # ─────────────────────────────────────────────────────────────────────────────

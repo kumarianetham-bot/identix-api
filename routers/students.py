@@ -77,6 +77,27 @@ async def create_student(
     if img and img.filename:
         photo_url = await upload_to_cloudinary(img, ref)
 
+ # Check for duplicate email
+    existing_email = db.query(models.Student).filter(
+        models.Student.email == email
+    ).first()
+    if existing_email:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A student with email '{email}' is already registered with ID {existing_email.student_id}"
+        )
+
+    # Check for duplicate name
+    existing_name = db.query(models.Student).filter(
+        models.Student.first_name == firstname,
+        models.Student.last_name  == secondname
+    ).first()
+    if existing_name:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A student named '{firstname} {secondname}' is already registered with ID {existing_name.student_id}"
+        )
+
     new_student = models.Student(
         student_id      = ref,
         first_name      = firstname,
