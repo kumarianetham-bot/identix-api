@@ -37,6 +37,7 @@ ICON_PHONE    = os.path.join(_HERE, "icon_phone.png")
 ICON_GLOBE    = os.path.join(_HERE, "icon_globe.png")
 ICON_EMAIL    = os.path.join(_HERE, "icon_email.png")
 
+WATERMARK_PATH = os.path.join(_HERE, "identix_logo.png")
 
 def _rrect(c, x, y, w, h, r, fill, stroke=None, sw=0.5):
     c.saveState()
@@ -107,6 +108,23 @@ def _make_qr(data):
             buf=io.BytesIO(); img.save(buf,"PNG"); buf.seek(0); return buf
         except: return None
 
+def _watermark(c, ox, oy, W, H):
+    if os.path.exists(WATERMARK_PATH):
+        try:
+            c.saveState()
+            wm = ImageReader(WATERMARK_PATH)
+            wm_w = W * 0.5
+            wm_h = wm_w
+            wm_x = ox + (W - wm_w) / 2
+            wm_y = oy + (H - wm_h) / 2
+            c.translate(wm_x + wm_w/2, wm_y + wm_h/2)
+            c.rotate(45)
+            c.translate(-(wm_x + wm_w/2), -(wm_y + wm_h/2))
+            c.setFillAlpha(0.06)
+            c.drawImage(wm, wm_x, wm_y, wm_w, wm_h,
+                        preserveAspectRatio=True, mask="auto")
+            c.restoreState()
+        except: pass
 
 def _front(c, ox, oy, student, card):
     W, H = CARD_W, CARD_H
@@ -149,6 +167,10 @@ def _front(c, ox, oy, student, card):
     c.setFont("Helvetica-Bold", 5.5)
     c.setFillColor(WHITE)
     c.drawCentredString(ox + W/2, oy + 2.5*mm, acad_year)
+
+ # Watermark
+    _watermark(c, ox, oy, W, H)
+
 
     # Logo
     lsz = 15*mm
@@ -230,15 +252,16 @@ def _front(c, ox, oy, student, card):
     c.line(mid, ny-6*mm, mid, oy+9*mm)
 
     # Shorten student ID display — show only first 10 characters
-sid = student.get("student_id","")
-sid_display = sid[:10] if len(sid) > 10 else sid
+    sid = student.get("student_id","")
+    sid_display = sid[:10] if len(sid) > 10 else sid
 
-rows_l = [
-    ("Student ID",    sid_display),
-    ("Date of Birth", student.get("date_of_birth","")),
-    ("Program",       student.get("speciality", student.get("department",""))),
-    ("Level",         student.get("level","")),
-]
+    rows_l = [
+        ("Student ID",    sid_display),
+        ("Date of Birth", student.get("date_of_birth","")),
+        ("Program",       student.get("speciality", student.get("department",""))),
+        ("Level",         student.get("level","")),
+    ]
+
     rows_r = [
         ("Campus",      student.get("campus","")),
         ("Issue Date",  card.get("issued_date","")),
@@ -299,6 +322,9 @@ def _back(c, ox, oy, student, card):
     c.drawPath(p3, fill=1, stroke=0)
 
     c.restoreState()
+
+ # Watermark
+    _watermark(c, ox, oy, W, H)
 
     # Header logo + name
     lsz = 13*mm
@@ -381,9 +407,9 @@ def _back(c, ox, oy, student, card):
         (ICON_EMAIL,    "info@yibs.cm"),
     ]
     slot = W / 4
-    fy_icon = oy + 6.5*mm
-    fy_text = oy + 2.5*mm
-    icon_size = 4*mm
+    fy_icon = oy + 5.5*mm
+    fy_text = oy + 2*mm
+    icon_size = 3*mm  
 
     for i, (icon_path, text) in enumerate(items):
         cx2 = ox + i*slot + slot/2
