@@ -17,22 +17,22 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 
 # ── Brand colours ─────────────────────────────────────────────────────────────
-DARK_BLUE   = HexColor("#1A2C6B")   # deep navy
-MID_BLUE    = HexColor("#1E4DB7")   # main blue
-LIGHT_BLUE  = HexColor("#4A90D9")   # accent blue
-PURPLE      = HexColor("#4B3A9B")   # purple accent
+DARK_BLUE   = HexColor("#1A2C6B")
+MID_BLUE    = HexColor("#1E4DB7")
+LIGHT_BLUE  = HexColor("#4A90D9")
+PURPLE      = HexColor("#4B3A9B")
 WHITE       = white
 BLACK       = black
-GREY        = HexColor("#F5F7FA")   # card background
+GREY        = HexColor("#F5F7FA")
 TEXT_DARK   = HexColor("#1A2C6B")
 TEXT_BLUE   = HexColor("#1E4DB7")
 
-# ── Card dimensions (slightly reduced from CR80) ──────────────────────────────
+# ── Card dimensions ────────────────────────────────────────────────────────────
 CARD_W = 80 * mm
 CARD_H = 50 * mm
 MARGIN = 12 * mm
 RADIUS = 3.5 * mm
-GAP    = 8 * mm   # gap between front and back
+GAP    = 8 * mm
 
 # ── Asset paths ───────────────────────────────────────────────────────────────
 _HERE     = os.path.dirname(os.path.abspath(__file__))
@@ -85,7 +85,6 @@ def _clip_round(c, x, y, w, h, r):
 
 
 def _gradient_h(c, x, y, w, h, col1, col2, steps=40):
-    """Horizontal gradient (left→right)."""
     for i in range(steps):
         t = i / steps
         r = col1.red   + (col2.red   - col1.red)   * t
@@ -94,22 +93,6 @@ def _gradient_h(c, x, y, w, h, col1, col2, steps=40):
         c.setFillColor(HexColor((int(r*255)<<16)|(int(g*255)<<8)|int(b*255)))
         sw = w / steps
         c.rect(x + i*sw, y, sw+0.5, h, fill=1, stroke=0)
-
-
-def _wave(c, ox, oy, w, h, color):
-    """Draw decorative wave curves (right side of card)."""
-    c.saveState()
-    c.setFillColor(color)
-    # outer wave
-    p = c.beginPath()
-    p.moveTo(ox + w, oy + h)
-    p.curveTo(ox + w - 15*mm, oy + h,
-              ox + w - 10*mm, oy + h * 0.6,
-              ox + w,         oy + h * 0.4)
-    p.lineTo(ox + w, oy + h)
-    p.close()
-    c.drawPath(p, fill=1, stroke=0)
-    c.restoreState()
 
 
 def _make_qr(data: str) -> io.BytesIO:
@@ -126,7 +109,6 @@ def _make_qr(data: str) -> io.BytesIO:
         buf.seek(0)
         return buf
     except ImportError:
-        # Pillow-only fallback
         try:
             from PIL import Image, ImageDraw
             sz = 200
@@ -154,7 +136,6 @@ def _make_qr(data: str) -> io.BytesIO:
 
 
 def _draw_logo(c, x, y, w, h):
-    """Draw school logo if file exists, else skip."""
     if os.path.exists(LOGO_PATH):
         c.drawImage(ImageReader(LOGO_PATH), x, y, w, h,
                     preserveAspectRatio=True, anchor="c", mask="auto")
@@ -164,52 +145,39 @@ def _draw_watermark(c, ox, oy, W, H):
     if os.path.exists(IDENTIX_WATERMARK_PATH):
         c.saveState()
         identix_logo = ImageReader(IDENTIX_WATERMARK_PATH)
-        # Calculate size to fit within card, maintaining aspect ratio
         img_w, img_h = identix_logo.getSize()
         aspect = img_h / img_w
-        
-        # Target watermark size (e.g., 50% of card width)
         watermark_w = W * 0.5
         watermark_h = watermark_w * aspect
-
-        # Ensure watermark doesn't exceed card height
         if watermark_h > H * 0.5:
             watermark_h = H * 0.5
             watermark_w = watermark_h / aspect
-
-        # Center the watermark
         wm_x = ox + (W - watermark_w) / 2
         wm_y = oy + (H - watermark_h) / 2
-
         c.translate(wm_x + watermark_w / 2, wm_y + watermark_h / 2)
-        c.rotate(45) # Rotate by 45 degrees
+        c.rotate(45)
         c.translate(-(wm_x + watermark_w / 2), -(wm_y + watermark_h / 2))
-
-        c.setFillAlpha(0.1) # Set transparency
+        c.setFillAlpha(0.1)
         c.drawImage(identix_logo, wm_x, wm_y, watermark_w, watermark_h,
                     preserveAspectRatio=True, mask='auto')
         c.restoreState()
 
+
 def _identix_logo(c, x, y):
-    """Draw the IDentix brand mark (styled text)."""
-    # iD box
     box_w, box_h = 11*mm, 8*mm
     _rounded_rect(c, x, y, box_w, box_h, 1.5*mm, MID_BLUE)
     c.setFillColor(WHITE)
     c.setFont("Helvetica-Bold", 9)
     c.drawString(x + 1.5*mm, y + 2.5*mm, "iD")
-    # IDentix text
     c.setFont("Helvetica-Bold", 11)
     c.setFillColor(DARK_BLUE)
     c.drawString(x + box_w + 1.5*mm, y + 2.5*mm, "IDentix")
-    # tagline
     c.setFont("Helvetica", 4)
     c.setFillColor(HexColor("#888888"))
     c.drawString(x + box_w + 1.5*mm, y + 0.5*mm, "Smart Identity for Smart Schools")
 
 
 def _info_row(c, lx, rx, y, label, value, val_color=None):
-    """Draw a label + value row."""
     c.setFont("Helvetica", 6)
     c.setFillColor(TEXT_DARK)
     c.drawString(lx, y, label)
@@ -219,17 +187,127 @@ def _info_row(c, lx, rx, y, label, value, val_color=None):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Vector footer icons (no image files needed)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _icon_location(c, cx, cy, s, color):
+    """Pin / location drop shape."""
+    c.saveState()
+    c.setFillColor(color)
+    c.setStrokeColor(color)
+    r = s * 0.38
+    # circle head
+    c.circle(cx, cy + s*0.22, r, fill=1, stroke=0)
+    # teardrop tail
+    p = c.beginPath()
+    p.moveTo(cx - r*0.75, cy + s*0.22)
+    p.curveTo(cx - r*0.75, cy - s*0.28, cx, cy - s*0.52, cx, cy - s*0.52)
+    p.curveTo(cx, cy - s*0.52, cx + r*0.75, cy - s*0.28, cx + r*0.75, cy + s*0.22)
+    p.close()
+    c.drawPath(p, fill=1, stroke=0)
+    # white inner dot
+    c.setFillColor(WHITE)
+    c.circle(cx, cy + s*0.22, r*0.38, fill=1, stroke=0)
+    c.restoreState()
+
+
+def _icon_phone(c, cx, cy, s, color):
+    """Simplified handset shape."""
+    c.saveState()
+    c.setFillColor(color)
+    c.setStrokeColor(color)
+    c.setLineWidth(s * 0.18)
+    c.setLineCap(1)
+    # draw as a rounded rectangle representing a mobile phone
+    pw, ph = s*0.55, s*0.85
+    px, py = cx - pw/2, cy - ph/2
+    p = c.beginPath()
+    rr = s * 0.1
+    p.moveTo(px+rr, py)
+    p.lineTo(px+pw-rr, py)
+    p.arcTo(px+pw-2*rr, py, px+pw, py+2*rr, -90, 90)
+    p.lineTo(px+pw, py+ph-rr)
+    p.arcTo(px+pw-2*rr, py+ph-2*rr, px+pw, py+ph, 0, 90)
+    p.lineTo(px+rr, py+ph)
+    p.arcTo(px, py+ph-2*rr, px+2*rr, py+ph, 90, 90)
+    p.lineTo(px, py+rr)
+    p.arcTo(px, py, px+2*rr, py+2*rr, 180, 90)
+    p.close()
+    c.drawPath(p, fill=1, stroke=0)
+    # white screen area
+    c.setFillColor(WHITE)
+    margin = s * 0.08
+    c.rect(px+margin, py+ph*0.18, pw-margin*2, ph*0.58, fill=1, stroke=0)
+    # white home button dot
+    c.circle(cx, py + ph*0.08, s*0.07, fill=1, stroke=0)
+    c.restoreState()
+
+
+def _icon_globe(c, cx, cy, s, color):
+    """Simple globe — circle with latitude/longitude lines."""
+    c.saveState()
+    r = s * 0.42
+    c.setStrokeColor(color)
+    c.setFillColor(color)
+    c.setLineWidth(s * 0.12)
+    # outer circle filled
+    c.circle(cx, cy, r, fill=1, stroke=0)
+    # white meridian lines
+    c.setStrokeColor(WHITE)
+    c.setLineWidth(s * 0.09)
+    # vertical centre line
+    c.line(cx, cy - r, cx, cy + r)
+    # horizontal equator
+    c.line(cx - r, cy, cx + r, cy)
+    # oval curves for longitude
+    c.arc(cx - r*0.5, cy - r, cx + r*0.5, cy + r, 0, 360)
+    c.restoreState()
+
+
+def _icon_email(c, cx, cy, s, color):
+    """Envelope shape."""
+    c.saveState()
+    ew, eh = s*0.9, s*0.65
+    ex, ey = cx - ew/2, cy - eh/2
+    c.setFillColor(color)
+    # envelope body
+    c.rect(ex, ey, ew, eh, fill=1, stroke=0)
+    # white flap (V shape)
+    c.setFillColor(WHITE)
+    p = c.beginPath()
+    p.moveTo(ex, ey + eh)
+    p.lineTo(cx, ey + eh*0.42)
+    p.lineTo(ex + ew, ey + eh)
+    p.close()
+    c.drawPath(p, fill=1, stroke=0)
+    # white bottom triangle to create open envelope look
+    p2 = c.beginPath()
+    p2.moveTo(ex, ey)
+    p2.lineTo(cx, ey + eh*0.48)
+    p2.lineTo(ex + ew, ey)
+    p2.close()
+    c.drawPath(p2, fill=1, stroke=0)
+    c.restoreState()
+
+
+_VECTOR_ICONS = {
+    "location": _icon_location,
+    "phone":    _icon_phone,
+    "globe":    _icon_globe,
+    "email":    _icon_email,
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  FRONT
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _draw_front(c, ox, oy, student, card):
     W, H = CARD_W, CARD_H
 
-    # Card base (white with shadow border)
     _rounded_rect(c, ox, oy, W, H, RADIUS, WHITE,
                   stroke=HexColor("#CCCCCC"), stroke_w=0.5)
 
-    # ── Right wave decoration ─────────────────────────────────────────────────
     c.saveState()
     _clip_round(c, ox, oy, W, H, RADIUS)
 
@@ -242,7 +320,7 @@ def _draw_front(c, ox, oy, student, card):
     p.close()
     c.drawPath(p, fill=1, stroke=0)
 
-    # Purple wave (smaller, on top)
+    # Purple wave
     c.setFillColor(PURPLE)
     p2 = c.beginPath()
     p2.moveTo(ox+W, oy+H)
@@ -267,12 +345,9 @@ def _draw_front(c, ox, oy, student, card):
     c.restoreState()
 
     # ── Header ────────────────────────────────────────────────────────────────
-    # School logo
     logo_size = 16*mm
     _draw_logo(c, ox+3*mm, oy+H-logo_size-2*mm, logo_size, logo_size)
 
-    
- # School name — color matches YIBS logo blue
     SCHOOL_BLUE = HexColor("#1B75BB")
     GOLD        = HexColor("#C8963E")
 
@@ -281,22 +356,15 @@ def _draw_front(c, ox, oy, student, card):
     c.drawString(ox+21*mm, oy+H-8*mm, "YAOUNDE INTERNATIONAL")
     c.drawString(ox+21*mm, oy+H-13*mm, "BUSINESS SCHOOL")
 
-    # Gold accent line under school name
-    c.setStrokeColor(GOLD)
-    c.setLineWidth(0.8)
-    c.line(ox+21*mm, oy+H-14*mm, ox+W-5*mm, oy+H-14*mm)
-
+    # CHANGE 1: Slogan updated to "Developing Innovative Professionals"
     c.setFont("Helvetica-Oblique", 5.5)
     c.setFillColor(SCHOOL_BLUE)
-    c.drawString(ox+21*mm, oy+H-17*mm, "Training Innovative Professionals")
+    c.drawString(ox+21*mm, oy+H-17*mm, "Developing Innovative Professionals")
+
+    # REMOVED: gold accent line and divider line under header
 
     # Watermark
     _draw_watermark(c, ox, oy, W, H)
-
-    # Divider line
-    c.setStrokeColor(HexColor("#DDDDDD"))
-    c.setLineWidth(0.5)
-    c.line(ox+3*mm, oy+H-19*mm, ox+W-3*mm, oy+H-19*mm)
 
     # ── Photo ─────────────────────────────────────────────────────────────────
     ph_x = ox + 3*mm
@@ -338,53 +406,49 @@ def _draw_front(c, ox, oy, student, card):
     c.drawCentredString(ph_x+ph_w/2, badge_y+1.2*mm, "STUDENT")
 
     # ── Student name ──────────────────────────────────────────────────────────
-    nx = ph_x + ph_w + 3*mm 
-    ny = oy + H - 22*mm
+    nx = ph_x + ph_w + 3*mm
     ny = oy + H - 22*mm
     first = student.get("first_name", "")
     last  = student.get("last_name", "")
-    GOLD  = HexColor("#C8963E")
+
+    # CHANGE 2: Academic year displayed in the blue bottom banner (white text)
+    acad_year = f"{datetime.now().year} — {datetime.now().year + 1}"
+    c.setFont("Helvetica-Bold", 6.5)
+    c.setFillColor(WHITE)
+    c.drawRightString(ox + W - 3*mm, oy + 2.5*mm, f"Academic Year:  {acad_year}")
 
     c.setFont("Helvetica-Bold", 11)
     c.setFillColor(DARK_BLUE)
     c.drawString(nx, ny, f"{first} {last}")
 
-    # Gold underline under name
+    # CHANGE 3: Only the gold underline beneath the name is kept
     c.setStrokeColor(GOLD)
     c.setLineWidth(0.8)
-    c.line(nx, ny-1.5*mm, ox+W-3*mm, ny-1.5*mm)
+    c.line(nx, ny - 1.5*mm, ox + W - 3*mm, ny - 1.5*mm)
 
-    # Academic year — small, fits in available space
-    acad_year = f"Academic Year: {datetime.now().year} — {datetime.now().year + 1}"
-    c.setFont("Helvetica", 4.5)
-    c.setFillColor(HexColor("#888888"))
-    c.drawRightString(ox+W-3*mm, ny-4*mm, acad_year)
-
-    # ── Info grid (2 columns) ─────────────────────────────────────────────────
+    # ── Info grid ─────────────────────────────────────────────────────────────
     col1_lbl = nx
     col1_val = nx + 14*mm
     col2_lbl = nx + (W - nx + ox) / 2 - ox + ox + 5*mm
     col2_val = col2_lbl + 13*mm
 
-    # vertical divider between columns
     mid_x = (col1_lbl + col2_lbl) / 2 + 10*mm
     c.setStrokeColor(HexColor("#DDDDDD"))
     c.setLineWidth(0.4)
     c.line(mid_x, ny-3*mm, mid_x, oy+9.5*mm)
 
     rows_left = [
-        ("Student ID",     student.get("student_id", ""),    TEXT_BLUE),
-        ("Date of Birth",  student.get("date_of_birth", ""), TEXT_BLUE),
-        ("Program",        student.get("speciality", student.get("department","")), TEXT_BLUE),
-        ("Level",          student.get("level", ""),          TEXT_BLUE),
+        ("Student ID",    student.get("student_id", ""),                              TEXT_BLUE),
+        ("Date of Birth", student.get("date_of_birth", ""),                           TEXT_BLUE),
+        ("Program",       student.get("speciality", student.get("department", "")),   TEXT_BLUE),
+        ("Level",         student.get("level", ""),                                   TEXT_BLUE),
     ]
-    
+
     rows_right = [
-    ("Campus",      student.get("campus", ""),        TEXT_BLUE),
-    ("Issue Date",  card.get("issued_date", ""),      TEXT_BLUE),
-    ("Valid Until", card.get("expire_date", ""),      TEXT_BLUE),
+        ("Campus",      student.get("campus", ""),       TEXT_BLUE),
+        ("Issue Date",  card.get("issued_date", ""),     TEXT_BLUE),
+        ("Valid Until", card.get("expire_date", ""),     TEXT_BLUE),
     ]
-    
 
     row_gap = 4.8*mm
     start_y = ny - 5*mm
@@ -404,7 +468,6 @@ def _draw_front(c, ox, oy, student, card):
 def _draw_back(c, ox, oy, student, card):
     W, H = CARD_W, CARD_H
 
-    # Card base
     _rounded_rect(c, ox, oy, W, H, RADIUS, WHITE,
                   stroke=HexColor("#CCCCCC"), stroke_w=0.5)
 
@@ -450,7 +513,7 @@ def _draw_back(c, ox, oy, student, card):
     # Watermark
     _draw_watermark(c, ox, oy, W, H)
 
-    # ── Header: logo + school name ────────────────────────────────────────────
+    # ── Header ────────────────────────────────────────────────────────────────
     logo_sz = 13*mm
     _draw_logo(c, ox+3*mm, oy+H-logo_sz-2.5*mm, logo_sz, logo_sz)
 
@@ -481,30 +544,30 @@ def _draw_back(c, ox, oy, student, card):
     for i, line in enumerate(lines):
         c.drawString(txt_x, txt_y - i*4.5*mm, line)
 
-    # ── Right body: QR code ───────────────────────────────────────────────────
+    # ── Right body: QR code — CHANGE 4: shifted further right ────────────────
     qr_size = 20*mm
-    qr_x = ox + W*0.52 + 3*mm
+    qr_x = ox + W*0.52 + 6*mm   # shifted right by extra 3 mm
     qr_y = oy + H - 19*mm - qr_size - 1*mm
 
-    qr_data = json.dumps({  
-    "student_id":    student.get("student_id"),
-    "name":          f"{student.get('first_name','')} {student.get('last_name','')}",
-    "email":         student.get("email", ""),
-    "department":    student.get("department", ""),
-    "speciality":    student.get("speciality", ""),
-    "level":         student.get("level", ""),
-    "campus":        student.get("campus", ""),
-    "nationality":   student.get("nationality", ""),
-    "date_of_birth": student.get("date_of_birth", ""),
-    "gender":        student.get("gender", ""),
-    "contact":       student.get("contact", ""),
-    "address":       student.get("address", ""),
-    "city":          student.get("city", ""),
-    "school":        student.get("school", ""),
-    "photo_url":     student.get("photo_url", ""),
-    "issued":        card.get("issued_date", ""),
-    "expires":       card.get("expire_date", ""),
-}, ensure_ascii=False)
+    qr_data = json.dumps({
+        "student_id":    student.get("student_id"),
+        "name":          f"{student.get('first_name','')} {student.get('last_name','')}",
+        "email":         student.get("email", ""),
+        "department":    student.get("department", ""),
+        "speciality":    student.get("speciality", ""),
+        "level":         student.get("level", ""),
+        "campus":        student.get("campus", ""),
+        "nationality":   student.get("nationality", ""),
+        "date_of_birth": student.get("date_of_birth", ""),
+        "gender":        student.get("gender", ""),
+        "contact":       student.get("contact", ""),
+        "address":       student.get("address", ""),
+        "city":          student.get("city", ""),
+        "school":        student.get("school", ""),
+        "photo_url":     student.get("photo_url", ""),
+        "issued":        card.get("issued_date", ""),
+        "expires":       card.get("expire_date", ""),
+    }, ensure_ascii=False)
 
     qr_buf = _make_qr(qr_data)
     if qr_buf:
@@ -520,65 +583,78 @@ def _draw_back(c, ox, oy, student, card):
     c.setFillColor(MID_BLUE)
     c.drawCentredString(qr_x + qr_size/2, qr_y - 4*mm, sid)
 
-    # ── Footer icons ──────────────────────────────────────────────────────────
-    contact = student.get("contact", student.get("emergency_phone", ""))
-    footer_y = oy + 2*mm
+    # ── Footer icons (vector-drawn, no image files needed) ───────────────────
+    contact  = student.get("contact", student.get("emergency_phone", ""))
+    email    = student.get("email", "")
+    website  = student.get("website", "www.yibs.cm")
 
+    # Footer sits inside the blue bar (oy to oy+9mm). Centre icons vertically.
+    footer_mid_y = oy + 4.5*mm   # vertical centre of the 9 mm bar
+
+    # Four evenly spaced items across the full card width
     items = [
-        (ICON_LOCATION, "Yaounde, Cameroon"),
-        (ICON_PHONE,    contact or "+237 6XX XXX XXX"),
-        (ICON_GLOBE,    "www.yibs.cm"),
-        (ICON_EMAIL,    "info@yibs.cm"),
+        ("location", "Yaounde, Cameroon"),
+        ("phone",    contact if contact else "+237 000 000 000"),
+        ("globe",    website),
+        ("email",    email if email else "info@yibs.cm"),
     ]
 
-    spacing = W / len(items)
-    icon_size = 4*mm
+    icon_s   = 3.5 * mm          # icon size
+    n        = len(items)
+    slot_w   = CARD_W / n        # width allocated per item
 
-    for i, (icon_path, text) in enumerate(items):
-        fx = ox + i * spacing + spacing / 2
+    for idx, (icon_key, text) in enumerate(items):
+        slot_cx = ox + slot_w * idx + slot_w / 2   # horizontal centre of slot
 
-        # Draw icon if file exists
-        if os.path.exists(icon_path):
-            c.drawImage(
-                ImageReader(icon_path),
-                fx - icon_size / 2,
-                footer_y + 3.5*mm,
-                icon_size,
-                icon_size,
-                preserveAspectRatio=True,
-                mask="auto"
-            )
+        # Draw vector icon centred in slot, vertically centred in footer bar
+        icon_fn = _VECTOR_ICONS.get(icon_key)
+        if icon_fn:
+            icon_fn(c, slot_cx, footer_mid_y + icon_s * 0.15, icon_s, WHITE)
 
-        # Text below icon
-        c.setFont("Helvetica", 4.2)
+        # Label text below the icon
+        c.setFont("Helvetica", 4)
         c.setFillColor(WHITE)
-        c.drawCentredString(fx, footer_y + 1*mm, text)
+        c.drawCentredString(slot_cx, footer_mid_y - icon_s * 0.72, text)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Public entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-def generate_id_card(student_data: dict, output_path: str) -> str:
-    try:
-        issued = student_data.get("issued_date",
-                                  datetime.now().strftime("%Y-%m-%d"))
-        expire = student_data.get("expire_date",
-                                  (datetime.now() + timedelta(days=365))
-                                  .strftime("%Y-%m-%d"))
-        card = {"issued_date": issued, "expire_date": expire}
+def generate_id_card(student: dict, card: dict, output_path: str) -> str:
+    """
+    Generate a PDF ID card (front + back side by side) and save to *output_path*.
 
-        page_w = CARD_W * 2 + MARGIN * 3 + GAP
-        page_h = CARD_H + MARGIN * 2
+    Parameters
+    ----------
+    student : dict
+        Keys: first_name, last_name, student_id, date_of_birth, department,
+              speciality, level, campus, nationality, gender, contact, email,
+              address, city, school, photo_url, website
+    card : dict
+        Keys: issued_date, expire_date
+    output_path : str
+        Destination file path, e.g. "YIBS_StudentID_JS001.pdf"
 
-        cv = canvas.Canvas(output_path, pagesize=(page_w, page_h))
-        cv.setTitle("IDentix — " + student_data.get("first_name", "") + " " + student_data.get("last_name", ""))
+    Returns
+    -------
+    str  — the resolved absolute path of the saved PDF
+    """
+    # ── Page size: two cards side by side with margins ────────────────────────
+    page_w = CARD_W * 2 + GAP + MARGIN * 2
+    page_h = CARD_H + MARGIN * 2
 
-        _draw_front(cv, MARGIN, MARGIN, student_data, card)
-        _draw_back(cv, MARGIN*2 + CARD_W + GAP, MARGIN, student_data, card)
+    c = canvas.Canvas(output_path, pagesize=(page_w, page_h))
 
-        cv.save()
-        return output_path
+    front_ox = MARGIN
+    front_oy = MARGIN
+    back_ox  = MARGIN + CARD_W + GAP
+    back_oy  = MARGIN
 
-    except Exception as e:
-        print(f"[pdf_generator] Error: {e}")
-        import traceback; traceback.print_exc()
-        return None
+    _draw_front(c, front_ox, front_oy, student, card)
+    _draw_back (c, back_ox,  back_oy,  student, card)
+
+    c.save()
+    return os.path.abspath(output_path)
+
+

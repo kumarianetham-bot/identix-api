@@ -12,7 +12,7 @@ class IDCard(BaseModel):
     student_id: str
     issued_date: str
     expire_date: str
-    pdf_url: Optional[str] = None  # ← added
+    pdf_url: Optional[str] = None  
 
 @router.post("/idcards")
 def create_idcard(idcard: IDCard, db: Session = Depends(get_db)):
@@ -43,7 +43,7 @@ def get_idcards(db: Session = Depends(get_db)):
             "student_id":  card.student_id,
             "issued_date": card.issued_date,
             "expire_date": card.expire_date,
-            "pdf_url":     card.pdf_url or "",  # ← added
+            "pdf_url":     card.pdf_url or "",  
             "first_name":  student.first_name  if student else "",
             "last_name":   student.last_name   if student else "",
             "email":       student.email       if student else "",
