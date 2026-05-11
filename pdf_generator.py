@@ -229,12 +229,16 @@ def _front(c, ox, oy, student, card):
     c.setLineWidth(0.4)
     c.line(mid, ny-6*mm, mid, oy+9*mm)
 
-    rows_l = [
-        ("Student ID",    student.get("student_id","")),
-        ("Date of Birth", student.get("date_of_birth","")),
-        ("Program",       student.get("speciality", student.get("department",""))),
-        ("Level",         student.get("level","")),
-    ]
+    # Shorten student ID display — show only first 10 characters
+sid = student.get("student_id","")
+sid_display = sid[:10] if len(sid) > 10 else sid
+
+rows_l = [
+    ("Student ID",    sid_display),
+    ("Date of Birth", student.get("date_of_birth","")),
+    ("Program",       student.get("speciality", student.get("department",""))),
+    ("Level",         student.get("level","")),
+]
     rows_r = [
         ("Campus",      student.get("campus","")),
         ("Issue Date",  card.get("issued_date","")),
