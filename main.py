@@ -15,7 +15,7 @@ from routers.students import router as students_router
 from routers.upload import router as upload_router
 from routers.stats import router as stats_router
 
-# Create all tables (including the new username/password columns via auth.py)
+# Create all tables in the database if the tables are not yet created
 models.Base.metadata.create_all(bind=engine)
 
 # Also ensure auth model columns exist (safe extend)

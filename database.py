@@ -26,8 +26,8 @@ def get_db():
         db.close()
 
 
-    #sqlalchemy → the tool that connects Python to PostgreSQL
- #create_engine → creates the actual connection to the database
+#sqlalchemy → the tool that connects Python to PostgreSQL
+#create_engine → creates the actual connection to the database
 #declarative_base → base class for your database models/tables
 #sessionmaker → creates a session to talk to the database
 #load_dotenv → reads your .env file

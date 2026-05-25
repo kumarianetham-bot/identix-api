@@ -26,7 +26,7 @@ class Student(Base):
     city = Column(String, nullable=True)
     school = Column(String, nullable=True)
     emergency_phone = Column(String, nullable=True)
-    created_at      = Column(String, nullable=True,   # ← NEW
+    created_at      = Column(String, nullable=True,   
                              default=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 
